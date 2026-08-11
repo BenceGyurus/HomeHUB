@@ -2,11 +2,14 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = process.env.DATABASE_PATH || './data/homehub.db';
-const dbDir = path.dirname(dbPath);
+const isTest = process.env.NODE_ENV === 'test';
+const dbPath = isTest ? ':memory:' : (process.env.DATABASE_PATH || './data/homehub.db');
 
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+if (!isTest) {
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
 }
 
 const db = new Database(dbPath);

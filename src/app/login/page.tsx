@@ -34,8 +34,9 @@ export default function LoginPage() {
         
         <form onSubmit={handleLocalLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
-            <label className="text-muted" style={{ fontSize: "0.875rem" }}>{t("username")}</label>
+            <label htmlFor="username-input" className="text-muted" style={{ fontSize: "0.875rem" }}>{t("username")}</label>
             <input 
+              id="username-input"
               type="text" 
               className="input" 
               value={username} 
@@ -44,8 +45,9 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="text-muted" style={{ fontSize: "0.875rem" }}>{t("password")}</label>
+            <label htmlFor="password-input" className="text-muted" style={{ fontSize: "0.875rem" }}>{t("password")}</label>
             <input 
+              id="password-input"
               type="password" 
               className="input" 
               value={password} 

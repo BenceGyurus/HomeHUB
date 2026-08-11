@@ -32,7 +32,7 @@ describe('Database', () => {
 
     db.prepare('INSERT INTO app_groups (app_id, group_id) VALUES (?, ?)').run(appInfo.lastInsertRowid, groupInfo.lastInsertRowid);
 
-    const ag = db.prepare('SELECT * FROM app_groups').all();
+    const ag = db.prepare('SELECT * FROM app_groups').all() as any[];
     expect(ag.length).toBe(1);
     expect(ag[0].app_id).toBe(appInfo.lastInsertRowid);
   });

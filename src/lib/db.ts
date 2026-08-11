@@ -74,8 +74,12 @@ const adminCount = db.prepare('SELECT count(*) as count FROM users WHERE is_admi
 if (adminCount.count === 0) {
   const bcrypt = require('bcrypt');
   const hash = bcrypt.hashSync('admin', 10);
-  db.prepare('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
-  console.log('Default admin user created (admin / admin). Please change the password later.');
+  try {
+    db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
+    console.log('Default admin user created or verified (admin / admin).');
+  } catch (e) {
+    // Ignore if it fails due to race condition during parallel Next.js builds
+  }
 }
 
 export default db;

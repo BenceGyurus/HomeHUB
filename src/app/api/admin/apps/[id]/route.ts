@@ -1,0 +1,27 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { getAuthOptions } from "@/lib/auth";
+import db from "@/lib/db";
+
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(getAuthOptions());
+  if (!(session?.user as any)?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const { name, description, custom_icon, launch_url, is_visible } = await req.json();
+
+  try {
+    const update = db.prepare(`
+      UPDATE apps 
+      SET name = ?, description = ?, custom_icon = ?, launch_url = ?, is_visible = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    
+    update.run(name, description, custom_icon || null, launch_url, is_visible ? 1 : 0, params.id);
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

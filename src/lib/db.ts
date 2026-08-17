@@ -4,20 +4,59 @@ import fs from 'fs';
 
 let _db: Database.Database | null = null;
 
-function getDb(): Database.Database {
-  if (_db) return _db;
-
+function getDbPath(): string {
   const isTest = process.env.NODE_ENV === 'test';
-  const dbPath = isTest ? ':memory:' : (process.env.DATABASE_PATH || './data/homehub.db');
+  if (isTest) return ':memory:';
 
-  if (!isTest) {
-    const dbDir = path.dirname(dbPath);
+  const preferredPath = process.env.DATABASE_PATH || './data/homehub.db';
+  const resolved = path.isAbsolute(preferredPath) 
+    ? preferredPath 
+    : path.resolve(process.cwd(), preferredPath);
+
+  const dbDir = path.dirname(resolved);
+  try {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
+    // Test write permission on directory
+    fs.accessSync(dbDir, fs.constants.W_OK);
+    return resolved;
+  } catch (err) {
+    console.warn(`[DB WARNING] Cannot write to directory "${dbDir}": ${err}. Attempting fallback directories.`);
+    const fallbacks = [
+      path.resolve(process.cwd(), 'homehub.db'),
+      '/tmp/homehub.db',
+    ];
+    for (const fb of fallbacks) {
+      try {
+        const fbDir = path.dirname(fb);
+        if (!fs.existsSync(fbDir)) fs.mkdirSync(fbDir, { recursive: true });
+        fs.accessSync(fbDir, fs.constants.W_OK);
+        console.log(`[DB INFO] Using writable fallback database path: ${fb}`);
+        return fb;
+      } catch {}
+    }
+    return resolved;
+  }
+}
+
+function getDb(): Database.Database {
+  if (_db) return _db;
+
+  const dbPath = getDbPath();
+  
+  try {
+    _db = new Database(dbPath, { timeout: 10000 });
+  } catch (err: any) {
+    console.error(`[DB ERROR] Failed to open database at "${dbPath}": ${err.message}. Trying in-memory database.`);
+    _db = new Database(':memory:');
   }
 
-  _db = new Database(dbPath);
+  // Configure pragmas for concurrency and durability
+  try {
+    _db.pragma('journal_mode = WAL');
+    _db.pragma('busy_timeout = 5000');
+  } catch {}
 
   // Initialize schema
   _db.exec(`
@@ -75,16 +114,16 @@ function getDb(): Database.Database {
     );
   `);
 
-  const adminCount = _db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };
-  if (adminCount.count === 0) {
-    const bcrypt = require('bcryptjs');
-    const hash = bcrypt.hashSync('admin', 10);
-    try {
+  try {
+    const adminCount = _db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };
+    if (adminCount && adminCount.count === 0) {
+      const bcrypt = require('bcryptjs');
+      const hash = bcrypt.hashSync('admin', 10);
       _db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
-      console.log('Default admin user created or verified (admin / admin).');
-    } catch (e) {
-      // Ignore if it fails due to race condition
+      console.log('[DB INFO] Default admin user initialized (admin / admin).');
     }
+  } catch (e) {
+    // Ignore if already initialized
   }
 
   return _db;

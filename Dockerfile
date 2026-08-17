@@ -32,23 +32,18 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV AUTH_TRUST_HOST="true"
 
-RUN groupadd --system --gid 1001 nodejs && \
-    useradd --system --uid 1001 nextjs
-
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 # Set the correct permission for prerender cache
-RUN mkdir .next && chown nextjs:nodejs .next
+RUN mkdir -p .next /app/data && chmod -R 777 /app/data
 
 # Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Create data directory for persistent sqlite database
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
-
-USER nextjs
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]

@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 
 # Install runtime libraries needed by SQLite
 RUN apt-get update && apt-get install -y libsqlite3-0 --no-install-recommends && rm -rf /var/lib/apt/lists/*

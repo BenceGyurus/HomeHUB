@@ -1,5 +1,7 @@
 import db from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboard() {
   const appsCount = (db.prepare('SELECT count(*) as count FROM apps').get() as any).count;
   const groupsCount = (db.prepare('SELECT count(*) as count FROM groups').get() as any).count;

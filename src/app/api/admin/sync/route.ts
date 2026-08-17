@@ -20,7 +20,7 @@ export async function POST() {
       VALUES (?, ?, ?, ?, ?, 1)
     `);
 
-    const transaction = db.transaction((appsList) => {
+    const transaction = db.transaction((appsList: any[]) => {
       for (const app of appsList) {
         insertApp.run(
           app.name, 

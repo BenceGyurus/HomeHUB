@@ -2,84 +2,104 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const isTest = process.env.NODE_ENV === 'test';
-const dbPath = isTest ? ':memory:' : (process.env.DATABASE_PATH || './data/homehub.db');
+let _db: Database.Database | null = null;
 
-if (!isTest) {
-  const dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+function getDb(): Database.Database {
+  if (_db) return _db;
+
+  const isTest = process.env.NODE_ENV === 'test';
+  const dbPath = isTest ? ':memory:' : (process.env.DATABASE_PATH || './data/homehub.db');
+
+  if (!isTest) {
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
   }
+
+  _db = new Database(dbPath);
+
+  // Initialize schema
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT,
+      is_admin BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS apps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      description TEXT,
+      icon_url TEXT,
+      custom_icon TEXT,
+      launch_url TEXT,
+      category TEXT,
+      sort_order INTEGER DEFAULT 0,
+      is_visible BOOLEAN DEFAULT 1,
+      is_imported BOOLEAN DEFAULT 0,
+      authentik_slug TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      authentik_pk TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS app_groups (
+      app_id INTEGER,
+      group_id INTEGER,
+      PRIMARY KEY (app_id, group_id),
+      FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      icon TEXT,
+      sort_order INTEGER DEFAULT 0,
+      color TEXT
+    );
+  `);
+
+  const adminCount = _db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };
+  if (adminCount.count === 0) {
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync('admin', 10);
+    try {
+      _db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
+      console.log('Default admin user created or verified (admin / admin).');
+    } catch (e) {
+      // Ignore if it fails due to race condition
+    }
+  }
+
+  return _db;
 }
 
-const db = new Database(dbPath);
-
-// Initialize schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT,
-    is_admin BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS apps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    slug TEXT UNIQUE NOT NULL,
-    description TEXT,
-    icon_url TEXT,
-    custom_icon TEXT,
-    launch_url TEXT,
-    category TEXT,
-    sort_order INTEGER DEFAULT 0,
-    is_visible BOOLEAN DEFAULT 1,
-    is_imported BOOLEAN DEFAULT 0,
-    authentik_slug TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS groups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    authentik_pk TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS app_groups (
-    app_id INTEGER,
-    group_id INTEGER,
-    PRIMARY KEY (app_id, group_id),
-    FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE,
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    icon TEXT,
-    sort_order INTEGER DEFAULT 0,
-    color TEXT
-  );
-`);
-
-const adminCount = db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };
-if (adminCount.count === 0) {
-  const bcrypt = require('bcryptjs');
-  const hash = bcrypt.hashSync('admin', 10);
-  try {
-    db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
-    console.log('Default admin user created or verified (admin / admin).');
-  } catch (e) {
-    // Ignore if it fails due to race condition during parallel Next.js builds
+const db = {
+  prepare: (query: string) => getDb().prepare(query),
+  exec: (query: string) => getDb().exec(query),
+  transaction: (fn: any) => getDb().transaction(fn),
+  close: () => {
+    if (_db) {
+      _db.close();
+      _db = null;
+    }
   }
-}
+};
 
 export default db;

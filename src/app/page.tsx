@@ -4,6 +4,8 @@ import db from "@/lib/db";
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const session = await getServerSession(getAuthOptions());
   const user = session?.user as any;

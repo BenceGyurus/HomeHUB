@@ -46,7 +46,7 @@ export async function syncGroups() {
   const groups = await fetchAuthentikGroups();
   const insert = db.prepare('INSERT OR REPLACE INTO groups (authentik_pk, name) VALUES (?, ?)');
   
-  const transaction = db.transaction((groupsList) => {
+  const transaction = db.transaction((groupsList: any[]) => {
     for (const group of groupsList) {
       insert.run(group.pk, group.name);
     }

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const data = await req.json();
   const insert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
   
-  const transaction = db.transaction((settingsObj) => {
+  const transaction = db.transaction((settingsObj: Record<string, any>) => {
     for (const [key, value] of Object.entries(settingsObj)) {
       insert.run(key, String(value));
     }

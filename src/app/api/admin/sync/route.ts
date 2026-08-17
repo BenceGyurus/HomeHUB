@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth";
-import { syncGroups, fetchAuthentikApps } from "@/lib/authentik";
+import { syncGroups, fetchAuthentikApps, testAuthentikConnection } from "@/lib/authentik";
 import db from "@/lib/db";
+
+export async function GET() {
+  const session = await getServerSession(getAuthOptions());
+  if (!(session?.user as any)?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  try {
+    const status = await testAuthentikConnection();
+    return NextResponse.json({ success: true, count: status.count });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
 
 export async function POST() {
   const session = await getServerSession(getAuthOptions());

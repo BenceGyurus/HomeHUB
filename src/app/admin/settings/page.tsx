@@ -61,15 +61,22 @@ export default function SettingsPage() {
     setTestLoading(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/admin/sync");
+      const res = await fetch("/api/admin/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: settings.authentik_api_url,
+          token: settings.authentik_api_token,
+        }),
+      });
       const data = await res.json();
-      if (res.ok && !data.error) {
-        setTestResult({ text: "Sikeres kapcsolat az Authentik API-val!", success: true });
+      if (res.ok && data.success) {
+        setTestResult({ text: data.message || "Sikeres kapcsolat az Authentik API-val!", success: true });
       } else {
         setTestResult({ text: `Hiba: ${data.error || "Nem sikerült kapcsolódni"}`, success: false });
       }
     } catch (e: any) {
-      setTestResult({ text: `Hálózati hiba: ${e.message}`, success: false });
+      setTestResult({ text: `Hiba: ${e.message}`, success: false });
     } finally {
       setTestLoading(false);
     }

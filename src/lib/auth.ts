@@ -4,6 +4,7 @@ import AuthentikProvider from "next-auth/providers/authentik";
 import db from "./db";
 import bcrypt from "bcryptjs";
 import type { RequestInternal } from "next-auth";
+import { logger } from "./logger";
 
 // Trust all incoming host headers (IPs, domains, reverse proxies)
 if (!process.env.AUTH_TRUST_HOST) {
@@ -26,13 +27,24 @@ export const getAuthOptions = (): NextAuthOptions => {
         password: { label: "Jelszó", type: "password" }
       },
       async authorize(credentials: Record<"username" | "password", string> | undefined, req: Pick<RequestInternal, "body" | "query" | "headers" | "method">) {
-        if (!credentials?.username || !credentials?.password) return null;
+        if (!credentials?.username || !credentials?.password) {
+          logger.auth(`Lokális bejelentkezés sikertelen: Hiányzó felhasználónév vagy jelszó`);
+          return null;
+        }
+
+        logger.auth(`Lokális bejelentkezési kísérlet a(z) "${credentials.username}" felhasználóval...`);
         const user = db.prepare('SELECT * FROM users WHERE username = ?').get(credentials.username) as any;
-        if (!user) return null;
+        if (!user) {
+          logger.warn('AUTH', `Nem található felhasználó "${credentials.username}" néven az adatbázisban.`);
+          return null;
+        }
         
         const isMatch = await bcrypt.compare(credentials.password, user.password_hash);
         if (isMatch) {
+          logger.auth(`Sikeres lokális bejelentkezés: ${user.username} (Admin: ${user.is_admin === 1})`);
           return { id: user.id.toString(), name: user.username, isAdmin: user.is_admin === 1 };
+        } else {
+          logger.warn('AUTH', `Helytelen jelszó a(z) "${credentials.username}" felhasználóhoz.`);
         }
         return null;
       }
@@ -41,6 +53,7 @@ export const getAuthOptions = (): NextAuthOptions => {
 
   // Authentik provider configured from DB
   if (settings.authentik_client_id && settings.authentik_client_secret && settings.authentik_issuer) {
+    logger.auth(`Authentik OIDC szolgáltató betöltve (${settings.authentik_issuer})`);
     providers.push(
       AuthentikProvider({
         clientId: settings.authentik_client_id,
@@ -76,6 +89,7 @@ export const getAuthOptions = (): NextAuthOptions => {
         if (account?.provider === 'authentik') {
           token.provider = 'authentik';
           token.groups = (profile as any)?.groups || [];
+          logger.auth(`Authentik SSO token generálva: ${(profile as any)?.preferred_username || token.name}, Csoportok: ${JSON.stringify(token.groups)}`);
         }
         return token;
       },

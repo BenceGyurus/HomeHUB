@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { logger } from './logger';
 
 let _db: Database.Database | null = null;
 
@@ -17,12 +18,13 @@ function getDbPath(): string {
   try {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
+      logger.db(`Adatbázis mappa létrehozva: ${dbDir}`);
     }
     // Test write permission on directory
     fs.accessSync(dbDir, fs.constants.W_OK);
     return resolved;
   } catch (err) {
-    console.warn(`[DB WARNING] Cannot write to directory "${dbDir}": ${err}. Attempting fallback directories.`);
+    logger.warn('DB', `Nem sikerült írni a(z) "${dbDir}" mappába: ${err}. Tartalék könyvtár keresése...`);
     const fallbacks = [
       path.resolve(process.cwd(), 'homehub.db'),
       '/tmp/homehub.db',
@@ -32,7 +34,7 @@ function getDbPath(): string {
         const fbDir = path.dirname(fb);
         if (!fs.existsSync(fbDir)) fs.mkdirSync(fbDir, { recursive: true });
         fs.accessSync(fbDir, fs.constants.W_OK);
-        console.log(`[DB INFO] Using writable fallback database path: ${fb}`);
+        logger.db(`Írható tartalék adatbázis kiválasztva: ${fb}`);
         return fb;
       } catch {}
     }
@@ -44,11 +46,12 @@ function getDb(): Database.Database {
   if (_db) return _db;
 
   const dbPath = getDbPath();
+  logger.db(`Adatbázis megnyitása: ${dbPath}`);
   
   try {
     _db = new Database(dbPath, { timeout: 10000 });
   } catch (err: any) {
-    console.error(`[DB ERROR] Failed to open database at "${dbPath}": ${err.message}. Trying in-memory database.`);
+    logger.error('DB', `Hiba a(z) "${dbPath}" megnyitásakor: ${err.message}. Memória adatbázis használata.`);
     _db = new Database(':memory:');
   }
 
@@ -56,7 +59,10 @@ function getDb(): Database.Database {
   try {
     _db.pragma('journal_mode = WAL');
     _db.pragma('busy_timeout = 5000');
-  } catch {}
+    logger.db(`WAL mód és 5000ms busy_timeout bekapcsolva.`);
+  } catch (e: any) {
+    logger.warn('DB', `Nem sikerült beállítani a WAL módot: ${e.message}`);
+  }
 
   // Initialize schema
   _db.exec(`
@@ -120,7 +126,7 @@ function getDb(): Database.Database {
       const bcrypt = require('bcryptjs');
       const hash = bcrypt.hashSync('admin', 10);
       _db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);
-      console.log('[DB INFO] Default admin user initialized (admin / admin).');
+      logger.db(`Alapértelmezett admin felhasználó létrehozva (admin / admin).`);
     }
   } catch (e) {
     // Ignore if already initialized

@@ -33,11 +33,15 @@ jest.mock('@/lib/db', () => {
           if (query.includes('FROM apps WHERE is_visible = 1')) {
             return appsTable.filter(a => a.is_visible === 1);
           }
-          if (query.includes('FROM groups WHERE name IN')) {
-            return groupsTable.filter(g => params.includes(g.name));
-          }
-          if (query.includes('FROM app_groups WHERE group_id IN')) {
-            return appGroupsTable.filter(ag => params.includes(ag.group_id));
+          if (query.includes('FROM app_groups ag')) {
+            return appGroupsTable.map(ag => {
+              const group = groupsTable.find(g => g.id === ag.group_id);
+              return {
+                app_id: ag.app_id,
+                group_name: group?.name || '',
+                authentik_pk: group?.authentik_pk || '',
+              };
+            });
           }
           return [];
         },
@@ -48,10 +52,21 @@ jest.mock('@/lib/db', () => {
   };
 });
 
-describe('Dashboard Page', () => {
+describe('Dashboard Page Access Control', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     (db as any)._reset();
+  });
+
+  it('renders locked view with login prompt for unauthenticated guest', async () => {
+    (getServerSession as jest.Mock).mockResolvedValueOnce(null);
+    (db as any)._setApps([{ id: 1, name: 'SecretApp', slug: 'secret-app', is_visible: 1 }]);
+
+    const jsx = await Home();
+    render(jsx);
+
+    expect(screen.getByText(/Hozzáférés Zárolva/)).toBeInTheDocument();
+    expect(screen.queryByText('SecretApp')).not.toBeInTheDocument();
   });
 
   it('renders all visible apps for admin', async () => {
@@ -65,33 +80,28 @@ describe('Dashboard Page', () => {
     expect(screen.getByText('AdminApp')).toBeInTheDocument();
   });
 
-  it('renders no apps if user has no group access', async () => {
+  it('renders apps assigned to user group for authenticated user', async () => {
     (getServerSession as jest.Mock).mockResolvedValueOnce({ 
-      user: { provider: 'authentik', groups: ['GroupA'] } 
+      user: { name: 'User1', provider: 'authentik', groups: ['MediaGroup'] } 
     });
-    // App exists but not assigned to GroupA
-    (db as any)._setApps([{ id: 1, name: 'SecretApp', slug: 'secret', is_visible: 1 }]);
-    (db as any)._setGroups([{ id: 2, name: 'GroupB', authentik_pk: 'gb' }]);
+    
+    (db as any)._setApps([
+      { id: 1, name: 'Plex', slug: 'plex', is_visible: 1 },
+      { id: 2, name: 'Router', slug: 'router', is_visible: 1 }
+    ]);
+    (db as any)._setGroups([
+      { id: 1, name: 'MediaGroup', authentik_pk: 'pk_media' },
+      { id: 2, name: 'NetworkGroup', authentik_pk: 'pk_network' }
+    ]);
+    (db as any)._setAppGroups([
+      { app_id: 1, group_id: 1 },
+      { app_id: 2, group_id: 2 }
+    ]);
     
     const jsx = await Home();
     render(jsx);
 
-    expect(screen.queryByText('SecretApp')).not.toBeInTheDocument();
-    expect(screen.getByText('Nincs megjeleníthető alkalmazás.')).toBeInTheDocument();
-  });
-
-  it('renders apps assigned to user group', async () => {
-    (getServerSession as jest.Mock).mockResolvedValueOnce({ 
-      user: { provider: 'authentik', groups: ['GroupA'] } 
-    });
-    
-    (db as any)._setApps([{ id: 1, name: 'AllowedApp', slug: 'allowed', is_visible: 1 }]);
-    (db as any)._setGroups([{ id: 1, name: 'GroupA', authentik_pk: 'ga' }]);
-    (db as any)._setAppGroups([{ app_id: 1, group_id: 1 }]);
-    
-    const jsx = await Home();
-    render(jsx);
-
-    expect(screen.getByText('AllowedApp')).toBeInTheDocument();
+    expect(screen.getByText('Plex')).toBeInTheDocument();
+    expect(screen.queryByText('Router')).not.toBeInTheDocument();
   });
 });

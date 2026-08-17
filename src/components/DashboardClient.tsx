@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
 import Link from "next/link";
-import { Search, ExternalLink, Shield, LogOut, Globe, Server, Layers, Cpu, Radio, Film } from "lucide-react";
+import { Search, ExternalLink, Shield, LogOut, Lock, Server, Layers, Cpu, Radio, Film, Key } from "lucide-react";
 
 interface AppItem {
   id: number;
@@ -23,6 +23,7 @@ interface DashboardClientProps {
     name?: string;
     email?: string;
     isAdmin?: boolean;
+    groups?: string[];
   } | null;
 }
 
@@ -122,19 +123,23 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="search-wrapper">
-          <Search className="search-icon" size={16} />
-          <input
-            ref={searchInputRef}
-            type="text"
-            className="search-input"
-            placeholder={t("search_placeholder")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <span className="kbd">⌘K</span>
-        </div>
+        {/* Search Bar - only active when user is logged in */}
+        {user ? (
+          <div className="search-wrapper">
+            <Search className="search-icon" size={16} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="search-input"
+              placeholder={t("search_placeholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <span className="kbd">⌘K</span>
+          </div>
+        ) : (
+          <div style={{ flex: 1 }}></div>
+        )}
 
         {/* Global Controls & User */}
         <div className="flex items-center gap-3">
@@ -158,9 +163,16 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
 
           {user ? (
             <div className="flex items-center gap-2">
-              <span className="tag" style={{ color: "var(--foreground)" }}>
-                {user.name || "User"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="tag" style={{ color: "var(--foreground)" }}>
+                  {user.name || "User"}
+                </span>
+                {user.isAdmin && (
+                  <span className="tag" style={{ background: "#ffffff", color: "#000000", fontWeight: 700 }}>
+                    ADMIN
+                  </span>
+                )}
+              </div>
               {user.isAdmin && (
                 <Link href="/admin" className="btn btn-sm flex items-center gap-1">
                   <Shield size={14} />
@@ -172,8 +184,9 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
               </Link>
             </div>
           ) : (
-            <Link href="/login" className="btn btn-primary btn-sm">
-              {t("login")}
+            <Link href="/login" className="btn btn-primary btn-sm flex items-center gap-1.5">
+              <Key size={13} />
+              <span>{t("login")}</span>
             </Link>
           )}
         </div>
@@ -183,141 +196,194 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
       <section className="flex justify-between items-end flex-wrap gap-4" style={{ marginBottom: "2rem" }}>
         <div>
           <h2 style={{ fontSize: "1.75rem", fontWeight: 700, letterSpacing: "-0.03em", margin: 0 }}>
-            {getGreeting()}{user?.name ? `, ${user.name}` : ""}
+            {user ? `${getGreeting()}, ${user.name}` : "HomeHUB Command Center"}
           </h2>
           <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: "0.25rem 0 0 0" }}>
-            {initialApps.length} {t("services_count")}
+            {user ? `${initialApps.length} ${t("services_count")}` : t("auth_required_desc")}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="status-dot status-online"></span>
           <span className="font-mono" style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Authentik SSO Active
+            Authentik SSO Guard
           </span>
         </div>
       </section>
 
-      {/* Category Tabs */}
-      <nav className="tab-list">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`tab-item flex items-center gap-1.5 ${isActive ? "active" : ""}`}
+      {/* When NOT logged in: Show locked portal view */}
+      {!user ? (
+        <main>
+          <div
+            className="card text-center"
+            style={{
+              padding: "4.5rem 2rem",
+              margin: "1.5rem 0",
+              border: "1px dashed var(--border)",
+              background: "#080808",
+              gap: "1.5rem",
+              alignItems: "center"
+            }}
+          >
+            <div
+              style={{
+                width: "60px",
+                height: "60px",
+                borderRadius: "50%",
+                background: "#141414",
+                border: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto"
+              }}
             >
-              <Icon size={14} />
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+              <Lock size={26} style={{ color: "var(--text-dim)" }} />
+            </div>
 
-      {/* Application Cards Grid */}
-      <main>
-        {filteredApps.length === 0 ? (
-          <div className="card text-center" style={{ padding: "4rem 2rem", margin: "2rem 0" }}>
-            <Server size={32} style={{ color: "var(--text-dim)", margin: "0 auto 1rem auto" }} />
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9375rem", margin: 0 }}>
-              {t("no_apps")}
-            </p>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="btn btn-sm"
-                style={{ alignSelf: "center", marginTop: "1rem" }}
+            <div style={{ maxWidth: "480px" }}>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 0.5rem 0", letterSpacing: "-0.02em" }}>
+                {t("auth_required")}
+              </h3>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", lineHeight: 1.6, margin: 0 }}>
+                {t("auth_required_desc")}
+              </p>
+            </div>
+
+            <div className="flex gap-3" style={{ marginTop: "0.5rem" }}>
+              <Link
+                href="/login"
+                className="btn btn-primary"
+                style={{ padding: "0.625rem 1.75rem", fontSize: "0.875rem", fontWeight: 600 }}
               >
-                Keresés törlése
-              </button>
-            )}
+                {t("login")} →
+              </Link>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-cards">
-            {filteredApps.map((app) => {
-              const portOrHost = getPortOrHost(app.launch_url);
+        </main>
+      ) : (
+        /* When Logged in: Show Category Tabs & Application Cards */
+        <>
+          <nav className="tab-list">
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = selectedCategory === cat.id;
               return (
-                <div key={app.id} className="card group" style={{ minHeight: "160px" }}>
-                  <div className="flex justify-between items-start" style={{ marginBottom: "0.75rem" }}>
-                    <div className="flex items-center gap-3">
-                      {app.custom_icon || app.icon_url ? (
-                        <img
-                          src={app.custom_icon || app.icon_url}
-                          alt={app.name}
-                          style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "var(--radius-sm)",
-                            objectFit: "contain",
-                            border: "1px solid var(--border)",
-                            background: "#111111",
-                            padding: "4px"
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "var(--radius-sm)",
-                            background: "#141414",
-                            border: "1px solid var(--border)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--foreground)",
-                            fontWeight: 700,
-                            fontSize: "0.875rem"
-                          }}
-                        >
-                          {app.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="card-title">{app.name}</h3>
-                        <span className="tag" style={{ textTransform: "capitalize", fontSize: "0.625rem" }}>
-                          {getAppCategory(app)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5" title="Service online">
-                      <span className="status-dot status-online"></span>
-                      <span className="font-mono" style={{ fontSize: "0.6875rem", color: "var(--text-dim)" }}>
-                        {t("online")}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="card-desc" style={{ flex: 1 }}>
-                    {app.description || "Self-hosted service"}
-                  </p>
-
-                  <div className="flex items-center justify-between" style={{ marginTop: "1.25rem", paddingTop: "0.75rem", borderTop: "1px solid #1a1a1a" }}>
-                    {portOrHost ? (
-                      <span className="tag">{portOrHost}</span>
-                    ) : (
-                      <span></span>
-                    )}
-
-                    <a
-                      href={app.launch_url || "#"}
-                      target={app.launch_url ? "_blank" : "_self"}
-                      rel="noreferrer"
-                      className="btn btn-sm btn-primary flex items-center gap-1"
-                    >
-                      <span>{t("launch")}</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  </div>
-                </div>
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`tab-item flex items-center gap-1.5 ${isActive ? "active" : ""}`}
+                >
+                  <Icon size={14} />
+                  <span>{cat.label}</span>
+                </button>
               );
             })}
-          </div>
-        )}
-      </main>
+          </nav>
+
+          <main>
+            {filteredApps.length === 0 ? (
+              <div className="card text-center" style={{ padding: "4rem 2rem", margin: "2rem 0" }}>
+                <Server size={32} style={{ color: "var(--text-dim)", margin: "0 auto 1rem auto" }} />
+                <p style={{ color: "var(--text-muted)", fontSize: "0.9375rem", margin: 0 }}>
+                  {searchQuery ? t("no_apps") : t("no_apps_for_role")}
+                </p>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="btn btn-sm"
+                    style={{ alignSelf: "center", marginTop: "1rem" }}
+                  >
+                    Keresés törlése
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-cards">
+                {filteredApps.map((app) => {
+                  const portOrHost = getPortOrHost(app.launch_url);
+                  return (
+                    <div key={app.id} className="card group" style={{ minHeight: "160px" }}>
+                      <div className="flex justify-between items-start" style={{ marginBottom: "0.75rem" }}>
+                        <div className="flex items-center gap-3">
+                          {app.custom_icon || app.icon_url ? (
+                            <img
+                              src={app.custom_icon || app.icon_url}
+                              alt={app.name}
+                              style={{
+                                width: "36px",
+                                height: "36px",
+                                borderRadius: "var(--radius-sm)",
+                                objectFit: "contain",
+                                border: "1px solid var(--border)",
+                                background: "#111111",
+                                padding: "4px"
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "36px",
+                                height: "36px",
+                                borderRadius: "var(--radius-sm)",
+                                background: "#141414",
+                                border: "1px solid var(--border)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--foreground)",
+                                fontWeight: 700,
+                                fontSize: "0.875rem"
+                              }}
+                            >
+                              {app.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="card-title">{app.name}</h3>
+                            <span className="tag" style={{ textTransform: "capitalize", fontSize: "0.625rem" }}>
+                              {getAppCategory(app)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5" title="Service online">
+                          <span className="status-dot status-online"></span>
+                          <span className="font-mono" style={{ fontSize: "0.6875rem", color: "var(--text-dim)" }}>
+                            {t("online")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="card-desc" style={{ flex: 1 }}>
+                        {app.description || "Self-hosted service"}
+                      </p>
+
+                      <div className="flex items-center justify-between" style={{ marginTop: "1.25rem", paddingTop: "0.75rem", borderTop: "1px solid #1a1a1a" }}>
+                        {portOrHost ? (
+                          <span className="tag">{portOrHost}</span>
+                        ) : (
+                          <span></span>
+                        )}
+
+                        <a
+                          href={app.launch_url || "#"}
+                          target={app.launch_url ? "_blank" : "_self"}
+                          rel="noreferrer"
+                          className="btn btn-sm btn-primary flex items-center gap-1"
+                        >
+                          <span>{t("launch")}</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       {/* Footer */}
       <footer className="flex justify-between items-center flex-wrap gap-4" style={{ marginTop: "4rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", color: "var(--text-dim)", fontSize: "0.75rem" }}>

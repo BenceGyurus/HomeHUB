@@ -42,7 +42,7 @@ export const getAuthOptions = (): NextAuthOptions => {
         const isMatch = await bcrypt.compare(credentials.password, user.password_hash);
         if (isMatch) {
           logger.auth(`Sikeres lokális bejelentkezés: ${user.username} (Admin: ${user.is_admin === 1})`);
-          return { id: user.id.toString(), name: user.username, isAdmin: user.is_admin === 1 };
+          return { id: user.id.toString(), name: user.username, isAdmin: user.is_admin === 1, groups: [] };
         } else {
           logger.warn('AUTH', `Helytelen jelszó a(z) "${credentials.username}" felhasználóhoz.`);
         }
@@ -85,11 +85,28 @@ export const getAuthOptions = (): NextAuthOptions => {
       async jwt({ token, user, account, profile }) {
         if (user) {
           token.isAdmin = (user as any).isAdmin;
+          token.groups = (user as any).groups || [];
         }
         if (account?.provider === 'authentik') {
           token.provider = 'authentik';
-          token.groups = (profile as any)?.groups || [];
-          logger.auth(`Authentik SSO token generálva: ${(profile as any)?.preferred_username || token.name}, Csoportok: ${JSON.stringify(token.groups)}`);
+          
+          const rawGroups = (profile as any)?.groups || (profile as any)?.['ak_groups'] || [];
+          const groups: string[] = Array.isArray(rawGroups)
+            ? rawGroups.map((g: any) => typeof g === 'string' ? g : (g.name || g.pk || String(g)))
+            : [];
+          
+          token.groups = groups;
+
+          const isSuperUser = Boolean((profile as any)?.is_superuser);
+          const hasAdminGroup = groups.some((g: string) => 
+            ['authentik_admins', 'admins', 'admin', 'superusers'].includes(g.toLowerCase())
+          );
+
+          if (isSuperUser || hasAdminGroup) {
+            token.isAdmin = true;
+          }
+
+          logger.auth(`Authentik SSO token generálva: ${(profile as any)?.preferred_username || token.name}, Csoportok: ${JSON.stringify(groups)}, Admin: ${token.isAdmin ? 'Igen' : 'Nem'}`);
         }
         return token;
       },

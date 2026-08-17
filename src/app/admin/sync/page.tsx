@@ -16,16 +16,22 @@ export default function SyncPage() {
 
     try {
       const res = await fetch("/api/admin/sync", { method: "POST" });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = { error: rawText || `Szerver válasz: HTTP ${res.status}` };
+      }
 
-      if (res.ok) {
+      if (res.ok && data.success) {
         setResult({
           message: data.message || "Az alkalmazások és csoportok sikeresen szinkronizálva!",
           success: true,
         });
       } else {
         setResult({
-          message: data.error || "Hiba történt a szinkronizálás során.",
+          message: data.error || `Hiba: HTTP ${res.status}`,
           success: false,
         });
       }

@@ -69,11 +69,19 @@ export default function SettingsPage() {
           token: settings.authentik_api_token,
         }),
       });
-      const data = await res.json();
+
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = { error: rawText || `Szerver válasz: HTTP ${res.status}` };
+      }
+
       if (res.ok && data.success) {
         setTestResult({ text: data.message || "Sikeres kapcsolat az Authentik API-val!", success: true });
       } else {
-        setTestResult({ text: `Hiba: ${data.error || "Nem sikerült kapcsolódni"}`, success: false });
+        setTestResult({ text: `Hiba: ${data.error || `HTTP ${res.status} ${res.statusText}`}`, success: false });
       }
     } catch (e: any) {
       setTestResult({ text: `Hiba: ${e.message}`, success: false });

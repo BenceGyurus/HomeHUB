@@ -4,6 +4,8 @@ import { getAuthOptions } from "@/lib/auth";
 import { syncGroups, fetchAuthentikApps, testAuthentikConnection } from "@/lib/authentik";
 import db from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await getServerSession(getAuthOptions());
   if (!(session?.user as any)?.isAdmin) {

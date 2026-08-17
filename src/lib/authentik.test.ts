@@ -4,18 +4,29 @@
 import { fetchAuthentikApps, fetchAuthentikGroups, syncGroups } from './authentik';
 import db from './db';
 
+jest.mock('./db', () => ({
+  __esModule: true,
+  default: {
+    prepare: jest.fn(),
+    transaction: jest.fn()
+  }
+}));
+
 // Mock global fetch
 global.fetch = jest.fn();
 
 describe('Authentik Integration', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    db.prepare('DELETE FROM settings').run();
-    db.prepare('DELETE FROM groups').run();
-    
-    // Set up dummy config in DB
-    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('authentik_api_url', 'http://fake');
-    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('authentik_api_token', 'token123');
+    (db.prepare as jest.Mock).mockReturnValue({
+      all: jest.fn().mockReturnValue([
+        { key: 'authentik_api_url', value: 'http://fake' },
+        { key: 'authentik_api_token', value: 'token123' }
+      ]),
+      run: jest.fn(),
+      get: jest.fn()
+    });
+    (db.transaction as jest.Mock).mockImplementation((fn) => fn);
   });
 
   it('fetchAuthentikApps should return apps on success', async () => {
@@ -40,6 +51,17 @@ describe('Authentik Integration', () => {
   });
 
   it('syncGroups should fetch groups and insert into db', async () => {
+    const mockRun = jest.fn();
+    (db.prepare as jest.Mock).mockReturnValue({
+      all: jest.fn().mockReturnValue([
+        { key: 'authentik_api_url', value: 'http://fake' },
+        { key: 'authentik_api_token', value: 'token123' }
+      ]),
+      run: mockRun,
+      get: jest.fn()
+    });
+    (db.transaction as jest.Mock).mockImplementation((fn) => fn);
+
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ results: [{ pk: 'uuid1', name: 'Group1' }] })
@@ -47,9 +69,6 @@ describe('Authentik Integration', () => {
 
     const count = await syncGroups();
     expect(count).toBe(1);
-
-    const group = db.prepare("SELECT * FROM groups WHERE authentik_pk = 'uuid1'").get() as any;
-    expect(group).toBeDefined();
-    expect(group.name).toBe('Group1');
+    expect(mockRun).toHaveBeenCalledWith('uuid1', 'Group1');
   });
 });

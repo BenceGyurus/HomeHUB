@@ -5,6 +5,11 @@ import db from "./db";
 import bcrypt from "bcryptjs";
 import type { RequestInternal } from "next-auth";
 
+// Trust all incoming host headers (IPs, domains, reverse proxies)
+if (!process.env.AUTH_TRUST_HOST) {
+  process.env.AUTH_TRUST_HOST = "true";
+}
+
 export const getAuthOptions = (): NextAuthOptions => {
   // Read settings from DB
   const settingsRows = db.prepare('SELECT key, value FROM settings').all() as { key: string, value: string }[];
@@ -45,9 +50,24 @@ export const getAuthOptions = (): NextAuthOptions => {
     );
   }
 
+  // Detect whether we should enforce secure cookies (only if NEXTAUTH_URL explicitly starts with https)
+  const isHttps = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+
   return {
     providers,
     secret: process.env.NEXTAUTH_SECRET || "default_secret_for_local_dev",
+    useSecureCookies: isHttps,
+    cookies: {
+      sessionToken: {
+        name: isHttps ? "__Secure-next-auth.session-token" : "next-auth.session-token",
+        options: {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          secure: isHttps,
+        }
+      }
+    },
     callbacks: {
       async jwt({ token, user, account, profile }) {
         if (user) {

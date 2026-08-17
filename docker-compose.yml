@@ -1,7 +1,7 @@
 services:
   homehub:
     build: .
-    image: ghcr.io/gyurus/homehub:latest
+    image: ghcr.io/bencegyurus/homehub:latest
     container_name: homehub
     restart: unless-stopped
     ports:
@@ -10,6 +10,8 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - NEXTAUTH_URL=https://gyurus.hu
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      - AUTH_TRUST_HOST=true
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-super-secret-change-me}
       - DATABASE_PATH=/app/data/homehub.db

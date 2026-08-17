@@ -13,8 +13,8 @@ describe('LoginPage', () => {
       </I18nProvider>
     );
 
-    expect(screen.getByText('Bejelentkezés (Local)')).toBeInTheDocument();
-    expect(screen.getByText('SSO Bejelentkezés (Authentik)')).toBeInTheDocument();
+    expect(screen.getByText('Lokális Belépés')).toBeInTheDocument();
+    expect(screen.getByText('Authentik SSO Belépés')).toBeInTheDocument();
   });
 
   it('calls signIn on local login submit', async () => {
@@ -29,7 +29,7 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText('Felhasználónév', { selector: 'input' }), { target: { value: 'admin' } });
     fireEvent.change(screen.getByLabelText('Jelszó', { selector: 'input' }), { target: { value: 'password' } });
     
-    fireEvent.click(screen.getByText('Bejelentkezés (Local)'));
+    fireEvent.click(screen.getByText('Lokális Belépés'));
 
     await waitFor(() => {
       expect(signIn).toHaveBeenCalledWith('credentials', {
@@ -47,7 +47,7 @@ describe('LoginPage', () => {
       </I18nProvider>
     );
 
-    fireEvent.click(screen.getByText('SSO Bejelentkezés (Authentik)'));
+    fireEvent.click(screen.getByText('Authentik SSO Belépés'));
 
     expect(signIn).toHaveBeenCalledWith('authentik', { callbackUrl: '/' });
   });

@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import db from './db';
 
 describe('Database', () => {

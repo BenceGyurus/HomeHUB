@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { fetchAuthentikApps, fetchAuthentikGroups, syncGroups } from './authentik';
 import db from './db';
 

@@ -2,7 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import AuthentikProvider from "next-auth/providers/authentik";
 import db from "./db";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import type { RequestInternal } from "next-auth";
 
 export const getAuthOptions = (): NextAuthOptions => {

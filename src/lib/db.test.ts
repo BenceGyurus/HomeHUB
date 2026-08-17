@@ -39,4 +39,8 @@ describe('Database', () => {
     expect(ag.length).toBe(1);
     expect(ag[0].app_id).toBe(appInfo.lastInsertRowid);
   });
+
+  afterAll(() => {
+    db.close();
+  });
 });

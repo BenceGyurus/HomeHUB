@@ -72,7 +72,7 @@ db.exec(`
 
 const adminCount = db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };
 if (adminCount.count === 0) {
-  const bcrypt = require('bcrypt');
+  const bcrypt = require('bcryptjs');
   const hash = bcrypt.hashSync('admin', 10);
   try {
     db.prepare('INSERT OR IGNORE INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('admin', hash);

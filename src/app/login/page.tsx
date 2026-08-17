@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   const { t } = useI18n();
   const [username, setUsername] = useState("");

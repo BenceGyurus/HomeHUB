@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Shield, Key, Globe, CheckCircle2, AlertCircle, Save, RefreshCw } from "lucide-react";
+import { Shield, Key, Globe, CheckCircle2, AlertCircle, Save, RefreshCw, Copy, Check, Info } from "lucide-react";
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -18,8 +18,14 @@ export default function SettingsPage() {
   const [testLoading, setTestLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [testResult, setTestResult] = useState<{ text: string; success: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [currentOrigin, setCurrentOrigin] = useState("");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentOrigin(window.location.origin);
+    }
+
     fetch("/api/admin/settings")
       .then((res) => res.json())
       .then((data) => {
@@ -28,6 +34,16 @@ export default function SettingsPage() {
         }
       });
   }, []);
+
+  const callbackUrl = currentOrigin ? `${currentOrigin}/api/auth/callback/authentik` : "http://<YOUR_IP_OR_DOMAIN>:3000/api/auth/callback/authentik";
+
+  const handleCopyCallback = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(callbackUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSettings({ ...settings, [e.target.name]: e.target.value });
@@ -207,6 +223,33 @@ export default function SettingsPage() {
               <h3 className="card-title">Authentik OpenID Connect (SSO)</h3>
               <p className="card-desc">Felhasználói egygombos bejelentkezés és csoporttagság-átvétel OIDC protokollon keresztül.</p>
             </div>
+          </div>
+
+          {/* Callback URL helper box */}
+          <div style={{ padding: "0.875rem", background: "#111111", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Info size={14} style={{ color: "var(--text-dim)" }} />
+                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)" }}>
+                  Authentik Providerben kötelező Redirect URI (Callback):
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyCallback}
+                className="btn btn-sm flex items-center gap-1.5"
+                style={{ fontSize: "0.6875rem", padding: "0.25rem 0.5rem" }}
+              >
+                {copied ? <Check size={12} style={{ color: "var(--status-online)" }} /> : <Copy size={12} />}
+                <span>{copied ? "Másolva!" : "Másolás"}</span>
+              </button>
+            </div>
+            <code style={{ display: "block", marginTop: "0.5rem", fontSize: "0.75rem", color: "#38bdf8", wordBreak: "break-all" }}>
+              {callbackUrl}
+            </code>
+            <p style={{ margin: "0.375rem 0 0 0", fontSize: "0.6875rem", color: "var(--text-dim)" }}>
+              Add hozzá ezt a pontos URL-t az Authentikben: <em>Applications → Providers → [A te Providered] → Redirect URIs / Origin URLs</em> mezőbe!
+            </p>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>

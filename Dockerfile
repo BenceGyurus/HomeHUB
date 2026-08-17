@@ -1,6 +1,9 @@
 FROM node:20-bookworm-slim AS base
 
-# Install build dependencies for native C++ addons (better-sqlite3, bcrypt)
+# Install runtime libraries needed by SQLite
+RUN apt-get update && apt-get install -y libsqlite3-0 --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
+# Install build dependencies for native C++ addons (better-sqlite3)
 FROM base AS deps
 RUN apt-get update && apt-get install -y python3 make g++ gcc sqlite3 libsqlite3-dev --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

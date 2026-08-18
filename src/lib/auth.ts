@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import AuthentikProvider from "next-auth/providers/authentik";
 import db from "./db";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import type { RequestInternal } from "next-auth";
 import { logger } from "./logger";
 
@@ -66,9 +67,21 @@ export const getAuthOptions = (): NextAuthOptions => {
   // Detect whether we should enforce secure cookies (only if NEXTAUTH_URL explicitly starts with https)
   const isHttps = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
 
+  // Secure secret generation / retrieval
+  let secret = process.env.NEXTAUTH_SECRET || settings.auth_secret;
+  if (!secret) {
+    secret = crypto.randomBytes(32).toString('hex');
+    try {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('auth_secret', secret);
+      logger.info('AUTH', 'Automatikus, 256-bites kriptográfiai titkosító kulcs generálva és elmentve.');
+    } catch {
+      // Fallback
+    }
+  }
+
   return {
     providers,
-    secret: process.env.NEXTAUTH_SECRET || "default_secret_for_local_dev",
+    secret,
     useSecureCookies: isHttps,
     cookies: {
       sessionToken: {

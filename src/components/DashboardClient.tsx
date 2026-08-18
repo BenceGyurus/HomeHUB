@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
 import Link from "next/link";
-import { Search, ExternalLink, Shield, LogOut, Lock, Server, Layers, Cpu, Radio, Film, Key, Home as HomeIcon, Sparkles } from "lucide-react";
+import { Search, ExternalLink, Shield, LogOut, Lock, Server, Layers, Cpu, Radio, Film, Key, Home as HomeIcon, Sparkles, RefreshCw } from "lucide-react";
 
 interface AppItem {
   id: number;
@@ -13,6 +13,7 @@ interface AppItem {
   icon_url?: string;
   custom_icon?: string;
   launch_url?: string;
+  healthcheck_url?: string;
   category?: string;
   is_visible?: number;
 }
@@ -31,6 +32,8 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
   const { t, lang, setLang } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [healthMap, setHealthMap] = useState<Record<number, { status: 'online' | 'offline' | 'checking'; latencyMs?: number }>>({});
+  const [isHealthRefreshing, setIsHealthRefreshing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
@@ -44,6 +47,38 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Health check polling
+  const fetchHealth = async () => {
+    if (!user || initialApps.length === 0) return;
+    setIsHealthRefreshing(true);
+
+    try {
+      const res = await fetch('/api/health-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appIds: initialApps.map((a) => a.id) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results) {
+          setHealthMap(data.results);
+        }
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setIsHealthRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchHealth();
+      const interval = setInterval(fetchHealth, 45000); // 45s interval
+      return () => clearInterval(interval);
+    }
+  }, [user, initialApps]);
 
   // Time-based greeting in Hungarian/English
   const getGreeting = () => {
@@ -272,11 +307,25 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
           </p>
         </div>
 
-        <div className="flex items-center gap-2" style={{ background: "rgba(16, 185, 129, 0.08)", padding: "0.375rem 0.75rem", borderRadius: "100px", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
-          <span className="status-dot status-online"></span>
-          <span className="font-mono" style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
-            Authentik SSO Védett
-          </span>
+        <div className="flex items-center gap-3">
+          {user && (
+            <button
+              onClick={fetchHealth}
+              disabled={isHealthRefreshing}
+              className="btn btn-sm btn-ghost flex items-center gap-1.5 text-muted"
+              title="Elérhetőség frissítése"
+            >
+              <RefreshCw size={12} className={isHealthRefreshing ? "animate-spin" : ""} />
+              <span>Élő állapot</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2" style={{ background: "rgba(16, 185, 129, 0.08)", padding: "0.375rem 0.75rem", borderRadius: "100px", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+            <span className="status-dot status-online"></span>
+            <span className="font-mono" style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
+              Authentik SSO Védett
+            </span>
+          </div>
         </div>
       </section>
 
@@ -373,6 +422,7 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
                   const portOrHost = getPortOrHost(app.launch_url);
                   const cat = getAppCategory(app);
                   const badge = getCategoryBadgeStyle(cat);
+                  const health = healthMap[app.id];
 
                   return (
                     <div
@@ -383,7 +433,7 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
                         justifyContent: "space-between",
                       }}
                     >
-                      {/* Top Row: Icon, Title, Category Badge, Status */}
+                      {/* Top Row: Icon, Title, Category Badge, Live Status */}
                       <div>
                         <div className="flex justify-between items-start" style={{ marginBottom: "0.875rem" }}>
                           <div className="flex items-center gap-3.5">
@@ -461,20 +511,58 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
                             </div>
                           </div>
 
-                          <div
-                            className="flex items-center gap-1.5"
-                            style={{
-                              background: "rgba(16, 185, 129, 0.08)",
-                              padding: "0.2rem 0.5rem",
-                              borderRadius: "100px",
-                              border: "1px solid rgba(16, 185, 129, 0.2)"
-                            }}
-                          >
-                            <span className="status-dot status-online"></span>
-                            <span className="font-mono" style={{ fontSize: "0.6875rem", color: "#34d399", fontWeight: 600 }}>
-                              {t("online")}
-                            </span>
-                          </div>
+                          {/* Live Health Status Indicator */}
+                          {health ? (
+                            health.status === 'online' ? (
+                              <div
+                                className="flex items-center gap-1.5"
+                                title={health.latencyMs ? `Válaszidő: ${health.latencyMs}ms` : "Szolgáltatás elérhető"}
+                                style={{
+                                  background: "rgba(16, 185, 129, 0.08)",
+                                  padding: "0.2rem 0.55rem",
+                                  borderRadius: "100px",
+                                  border: "1px solid rgba(16, 185, 129, 0.25)"
+                                }}
+                              >
+                                <span className="status-dot status-online"></span>
+                                <span className="font-mono" style={{ fontSize: "0.6875rem", color: "#34d399", fontWeight: 600 }}>
+                                  {health.latencyMs ? `${health.latencyMs}ms` : t("online")}
+                                </span>
+                              </div>
+                            ) : (
+                              <div
+                                className="flex items-center gap-1.5"
+                                title="A szolgáltatás nem válaszol (Offline)"
+                                style={{
+                                  background: "rgba(239, 68, 68, 0.1)",
+                                  padding: "0.2rem 0.55rem",
+                                  borderRadius: "100px",
+                                  border: "1px solid rgba(239, 68, 68, 0.3)"
+                                }}
+                              >
+                                <span className="status-dot status-error"></span>
+                                <span className="font-mono" style={{ fontSize: "0.6875rem", color: "#f87171", fontWeight: 600 }}>
+                                  Offline
+                                </span>
+                              </div>
+                            )
+                          ) : (
+                            <div
+                              className="flex items-center gap-1.5"
+                              title="Állapot vizsgálata..."
+                              style={{
+                                background: "rgba(245, 158, 11, 0.08)",
+                                padding: "0.2rem 0.55rem",
+                                borderRadius: "100px",
+                                border: "1px solid rgba(245, 158, 11, 0.25)"
+                              }}
+                            >
+                              <span className="status-dot" style={{ background: "#fbbf24", boxShadow: "0 0 8px rgba(245, 158, 11, 0.5)" }}></span>
+                              <span className="font-mono" style={{ fontSize: "0.6875rem", color: "#fbbf24", fontWeight: 500 }}>
+                                Ellenőrzés...
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Description */}

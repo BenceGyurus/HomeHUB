@@ -39,15 +39,25 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, slug, description, launch_url, custom_icon, category, is_visible } = body;
+  const { name, slug, description, launch_url, healthcheck_url, custom_icon, category, is_visible } = body;
 
   try {
     const cleanUrl = sanitizeUrl(launch_url);
+    const cleanHealthUrl = sanitizeUrl(healthcheck_url);
     const insert = db.prepare(`
-      INSERT INTO apps (name, slug, description, launch_url, custom_icon, category, is_visible)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO apps (name, slug, description, launch_url, healthcheck_url, custom_icon, category, is_visible)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const info = insert.run(name, slug, description || '', cleanUrl, custom_icon || '', category || 'general', is_visible ? 1 : 0);
+    const info = insert.run(
+      name, 
+      slug, 
+      description || '', 
+      cleanUrl, 
+      cleanHealthUrl || null, 
+      custom_icon || '', 
+      category || 'general', 
+      is_visible ? 1 : 0
+    );
     return NextResponse.json({ success: true, id: info.lastInsertRowid });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

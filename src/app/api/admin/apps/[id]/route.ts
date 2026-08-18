@@ -30,17 +30,27 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const { name, description, custom_icon, launch_url, category, is_visible } = await req.json();
+  const { name, description, custom_icon, launch_url, healthcheck_url, category, is_visible } = await req.json();
 
   try {
     const cleanUrl = sanitizeUrl(launch_url);
+    const cleanHealthUrl = sanitizeUrl(healthcheck_url);
     const update = db.prepare(`
       UPDATE apps 
-      SET name = ?, description = ?, custom_icon = ?, launch_url = ?, category = ?, is_visible = ?, updated_at = CURRENT_TIMESTAMP
+      SET name = ?, description = ?, custom_icon = ?, launch_url = ?, healthcheck_url = ?, category = ?, is_visible = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
     
-    update.run(name, description, custom_icon || null, cleanUrl, category || 'general', is_visible ? 1 : 0, id);
+    update.run(
+      name, 
+      description, 
+      custom_icon || null, 
+      cleanUrl, 
+      cleanHealthUrl || null, 
+      category || 'general', 
+      is_visible ? 1 : 0, 
+      id
+    );
     logger.info('DB', `Alkalmazás (ID: ${id}) sikeresen módosítva.`);
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -58,7 +68,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
 
   try {
-    // Delete group relations first
     db.prepare('DELETE FROM app_groups WHERE app_id = ?').run(id);
     db.prepare('DELETE FROM apps WHERE id = ?').run(id);
     logger.info('DB', `Alkalmazás és csoportkapcsolatai törölve (ID: ${id}).`);

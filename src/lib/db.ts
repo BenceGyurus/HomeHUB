@@ -82,6 +82,7 @@ function getDb(): Database.Database {
       icon_url TEXT,
       custom_icon TEXT,
       launch_url TEXT,
+      healthcheck_url TEXT,
       category TEXT,
       sort_order INTEGER DEFAULT 0,
       is_visible BOOLEAN DEFAULT 1,
@@ -119,6 +120,13 @@ function getDb(): Database.Database {
       color TEXT
     );
   `);
+
+  // Migrations for existing databases
+  try {
+    _db.exec(`ALTER TABLE apps ADD COLUMN healthcheck_url TEXT;`);
+  } catch {
+    // Column already exists
+  }
 
   try {
     const adminCount = _db.prepare('SELECT count(*) as count FROM users WHERE is_admin = 1').get() as { count: number };

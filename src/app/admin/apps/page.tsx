@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Eye, EyeOff, Edit, X, Plus, ExternalLink, Search, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Eye, EyeOff, Edit, X, Plus, ExternalLink, Search, Sparkles, Image as ImageIcon, Activity, Trash2 } from "lucide-react";
 import IconPickerModal from "@/components/IconPickerModal";
 import { findMatchingIcon } from "@/lib/icons";
 
@@ -20,6 +20,7 @@ export default function AppsPage() {
     slug: "",
     description: "",
     launch_url: "",
+    healthcheck_url: "",
     custom_icon: "",
     category: "general",
     is_visible: true,
@@ -70,6 +71,17 @@ export default function AppsPage() {
     fetchApps();
   };
 
+  const handleDeleteApp = async (id: number, name: string) => {
+    if (!confirm(`Biztosan törölni szeretnéd a(z) "${name}" alkalmazást?`)) return;
+
+    await fetch(`/api/admin/apps/${id}`, {
+      method: "DELETE",
+    });
+
+    setEditingApp(null);
+    fetchApps();
+  };
+
   const handleCreateApp = async (e: React.FormEvent) => {
     e.preventDefault();
     const slug = newApp.slug || newApp.name.toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -86,6 +98,7 @@ export default function AppsPage() {
       slug: "",
       description: "",
       launch_url: "",
+      healthcheck_url: "",
       custom_icon: "",
       category: "general",
       is_visible: true,
@@ -131,7 +144,7 @@ export default function AppsPage() {
             {t("apps")}
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", margin: "0.25rem 0 0 0" }}>
-            Szolgáltatások konfigurálása, homelab ikonok és láthatóság kezelése
+            Szolgáltatások konfigurálása, homelab ikonok, élő healthcheck és jogosultságok
           </p>
         </div>
 
@@ -169,6 +182,7 @@ export default function AppsPage() {
               <th>Alkalmazás</th>
               <th>Kategória</th>
               <th>Launch URL</th>
+              <th>Healthcheck</th>
               <th>Forrás</th>
               <th>Láthatóság</th>
               <th className="text-right">Műveletek</th>
@@ -177,7 +191,7 @@ export default function AppsPage() {
           <tbody>
             {filteredApps.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+                <td colSpan={7} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
                   {t("no_apps")}
                 </td>
               </tr>
@@ -221,7 +235,7 @@ export default function AppsPage() {
                       <div>
                         <div style={{ fontWeight: 600, color: "var(--foreground)" }}>{app.name}</div>
                         {app.description && (
-                          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {app.description}
                           </div>
                         )}
@@ -244,13 +258,24 @@ export default function AppsPage() {
                         className="flex items-center gap-1 font-mono"
                         style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}
                       >
-                        <span style={{ maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <span style={{ maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {app.launch_url}
                         </span>
                         <ExternalLink size={10} />
                       </a>
                     ) : (
                       <span className="text-dim">—</span>
+                    )}
+                  </td>
+
+                  <td>
+                    {app.healthcheck_url ? (
+                      <span className="tag tag-accent flex items-center gap-1" style={{ maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <Activity size={10} />
+                        <span>Egyedi</span>
+                      </span>
+                    ) : (
+                      <span className="tag" style={{ fontSize: "0.6875rem" }}>Launch URL</span>
                     )}
                   </td>
 
@@ -431,9 +456,25 @@ export default function AppsPage() {
                     className="input"
                     value={editingApp.launch_url || ""}
                     onChange={(e) => setEditingApp({ ...editingApp, launch_url: e.target.value })}
-                    placeholder="https://plex.gyurus.hu"
+                    placeholder="https://immich.gyurus.hu"
                   />
                 </div>
+              </div>
+
+              {/* Healthcheck URL field */}
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
+                  Egyedi Healthcheck URL (Opcionális)
+                </label>
+                <input
+                  className="input"
+                  value={editingApp.healthcheck_url || ""}
+                  onChange={(e) => setEditingApp({ ...editingApp, healthcheck_url: e.target.value })}
+                  placeholder="pl. https://immich.gyurus.hu/api/server-info/ping (ha üres, a Launch URL-t vizsgálja)"
+                />
+                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.6875rem", color: "var(--text-dim)" }}>
+                  A főoldali zöld/piros elérhetőségi állapot ezt a végpontot próbálja le valós időben.
+                </p>
               </div>
 
               <div style={{ paddingTop: "0.5rem" }}>
@@ -448,17 +489,28 @@ export default function AppsPage() {
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2" style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
+              <div className="flex justify-between items-center" style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
                 <button
                   type="button"
-                  onClick={() => setEditingApp(null)}
-                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleDeleteApp(editingApp.id, editingApp.name)}
+                  className="btn btn-danger btn-sm flex items-center gap-1.5"
                 >
-                  Mégse
+                  <Trash2 size={13} />
+                  <span>Törlés</span>
                 </button>
-                <button type="submit" className="btn btn-primary btn-sm">
-                  {t("save")}
-                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingApp(null)}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Mégse
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm">
+                    {t("save")}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -601,6 +653,22 @@ export default function AppsPage() {
                     placeholder="https://pve.gyurus.hu:8006"
                   />
                 </div>
+              </div>
+
+              {/* Healthcheck URL field */}
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
+                  Egyedi Healthcheck URL (Opcionális)
+                </label>
+                <input
+                  className="input"
+                  value={newApp.healthcheck_url}
+                  onChange={(e) => setNewApp({ ...newApp, healthcheck_url: e.target.value })}
+                  placeholder="pl. https://immich.gyurus.hu/api/server-info/ping (ha üres, a Launch URL-t vizsgálja)"
+                />
+                <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.6875rem", color: "var(--text-dim)" }}>
+                  A főoldali elérhetőség jelző ezt a végpontot próbálja le.
+                </p>
               </div>
 
               <div style={{ paddingTop: "0.5rem" }}>

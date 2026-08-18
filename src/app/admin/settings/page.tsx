@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Shield, Key, Globe, CheckCircle2, AlertCircle, Save, RefreshCw, Copy, Check, Info } from "lucide-react";
+import { Shield, Key, Globe, CheckCircle2, AlertCircle, Save, RefreshCw, Copy, Check, Info, Lock } from "lucide-react";
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -20,6 +20,15 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ text: string; success: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [currentOrigin, setCurrentOrigin] = useState("");
+
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -106,6 +115,42 @@ export default function SettingsPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    setPasswordMessage(null);
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordMessage({ text: "Az új jelszavak nem egyeznek meg!", type: "error" });
+      setPasswordLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+          confirmPassword: passwordForm.confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPasswordMessage({ text: data.message || "A jelszó sikeresen megváltozott!", type: "success" });
+        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      } else {
+        setPasswordMessage({ text: data.error || "Nem sikerült megváltoztatni a jelszót.", type: "error" });
+      }
+    } catch (e: any) {
+      setPasswordMessage({ text: `Hiba: ${e.message}`, type: "error" });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
       {/* Header */}
@@ -115,7 +160,7 @@ export default function SettingsPage() {
             {t("settings")}
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", margin: "0.25rem 0 0 0" }}>
-            Authentik SSO és API integráció konfigurálása
+            Authentik SSO, API integráció és helyi felhasználói beállítások
           </p>
         </div>
 
@@ -321,6 +366,93 @@ export default function SettingsPage() {
           </div>
         </div>
       </form>
+
+      {/* Section 4: Local Admin Password Change */}
+      <div className="card" style={{ gap: "1.25rem" }}>
+        <div className="flex items-center gap-2">
+          <Lock size={18} style={{ color: "var(--text-muted)" }} />
+          <div>
+            <h3 className="card-title">Lokális Felhasználó Jelszómódosítása</h3>
+            <p className="card-desc">A helyi adminisztrátor (admin) jelszavának frissítése.</p>
+          </div>
+        </div>
+
+        {passwordMessage && (
+          <div
+            className="card"
+            style={{
+              padding: "0.75rem 1rem",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: "0.5rem",
+              borderColor: passwordMessage.type === "success" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)",
+              backgroundColor: passwordMessage.type === "success" ? "rgba(16, 185, 129, 0.05)" : "rgba(239, 68, 68, 0.05)",
+              color: passwordMessage.type === "success" ? "var(--status-online)" : "var(--status-error)",
+            }}
+          >
+            {passwordMessage.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+            <span style={{ fontSize: "0.8125rem", fontWeight: 500 }}>{passwordMessage.text}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+            <div>
+              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.375rem" }}>
+                Jelenlegi Jelszó
+              </label>
+              <input
+                type="password"
+                className="input"
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.375rem" }}>
+                Új Jelszó
+              </label>
+              <input
+                type="password"
+                className="input"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                placeholder="Legalább 3 karakter..."
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.375rem" }}>
+                Új Jelszó Megerősítése
+              </label>
+              <input
+                type="password"
+                className="input"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={passwordLoading}
+              className="btn btn-primary flex items-center gap-1.5"
+              style={{ alignSelf: "flex-start" }}
+            >
+              <Lock size={14} />
+              <span>{passwordLoading ? "Mentés folyamatban..." : "Jelszó Megváltoztatása"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

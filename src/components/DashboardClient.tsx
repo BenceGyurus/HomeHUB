@@ -310,6 +310,11 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
                             <img
                               src={app.custom_icon || app.icon_url}
                               alt={app.name}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                                const fallback = (e.target as HTMLElement).nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = "flex";
+                              }}
                               style={{
                                 width: "36px",
                                 height: "36px",
@@ -320,25 +325,24 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
                                 padding: "4px"
                               }}
                             />
-                          ) : (
-                            <div
-                              style={{
-                                width: "36px",
-                                height: "36px",
-                                borderRadius: "var(--radius-sm)",
-                                background: "#141414",
-                                border: "1px solid var(--border)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "var(--foreground)",
-                                fontWeight: 700,
-                                fontSize: "0.875rem"
-                              }}
-                            >
-                              {app.name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          ) : null}
+                          <div
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "var(--radius-sm)",
+                              background: "#141414",
+                              border: "1px solid var(--border)",
+                              display: (app.custom_icon || app.icon_url) ? "none" : "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "var(--foreground)",
+                              fontWeight: 700,
+                              fontSize: "0.875rem"
+                            }}
+                          >
+                            {app.name.charAt(0).toUpperCase()}
+                          </div>
                           <div>
                             <h3 className="card-title">{app.name}</h3>
                             <span className="tag" style={{ textTransform: "capitalize", fontSize: "0.625rem" }}>

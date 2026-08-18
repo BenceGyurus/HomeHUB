@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Eye, EyeOff, Edit, X, Plus, ExternalLink, Search, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Edit, X, Plus, ExternalLink, Search, Sparkles, Image as ImageIcon } from "lucide-react";
+import IconPickerModal from "@/components/IconPickerModal";
+import { findMatchingIcon } from "@/lib/icons";
 
 export default function AppsPage() {
   const { t } = useI18n();
@@ -10,6 +12,9 @@ export default function AppsPage() {
   const [searchFilter, setSearchFilter] = useState("");
   const [editingApp, setEditingApp] = useState<any | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+  const [iconPickerTarget, setIconPickerTarget] = useState<"new" | "edit">("new");
+
   const [newApp, setNewApp] = useState({
     name: "",
     slug: "",
@@ -31,6 +36,25 @@ export default function AppsPage() {
   useEffect(() => {
     fetchApps();
   }, []);
+
+  const handleNameChange = (name: string, target: "new" | "edit") => {
+    const matching = findMatchingIcon(name);
+    if (target === "new") {
+      setNewApp((prev) => ({
+        ...prev,
+        name,
+        // Auto suggest icon if not already set
+        custom_icon: prev.custom_icon ? prev.custom_icon : (matching ? matching.url : ""),
+        category: prev.category === "general" && matching ? matching.category : prev.category,
+      }));
+    } else if (editingApp) {
+      setEditingApp((prev: any) => ({
+        ...prev,
+        name,
+        custom_icon: prev.custom_icon ? prev.custom_icon : (matching ? matching.url : ""),
+      }));
+    }
+  };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +103,19 @@ export default function AppsPage() {
     fetchApps();
   };
 
+  const openIconPicker = (target: "new" | "edit") => {
+    setIconPickerTarget(target);
+    setIsIconPickerOpen(true);
+  };
+
+  const handleIconSelected = (iconUrl: string) => {
+    if (iconPickerTarget === "new") {
+      setNewApp((prev) => ({ ...prev, custom_icon: iconUrl }));
+    } else if (editingApp) {
+      setEditingApp((prev: any) => ({ ...prev, custom_icon: iconUrl }));
+    }
+  };
+
   const filteredApps = apps.filter(
     (app) =>
       app.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -94,7 +131,7 @@ export default function AppsPage() {
             {t("apps")}
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.8125rem", margin: "0.25rem 0 0 0" }}>
-            Szolgáltatások konfigurálása, ikonok és láthatóság kezelése
+            Szolgáltatások konfigurálása, homelab ikonok és láthatóság kezelése
           </p>
         </div>
 
@@ -283,12 +320,12 @@ export default function AppsPage() {
             <form onSubmit={handleSaveEdit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div>
                 <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                  Alkalmazás Neve
+                  Alkalmazás Neve *
                 </label>
                 <input
                   className="input"
                   value={editingApp.name || ""}
-                  onChange={(e) => setEditingApp({ ...editingApp, name: e.target.value })}
+                  onChange={(e) => handleNameChange(e.target.value, "edit")}
                   required
                 />
               </div>
@@ -304,41 +341,99 @@ export default function AppsPage() {
                 />
               </div>
 
+              {/* Icon Selection Card */}
+              <div style={{ padding: "0.875rem", background: "#111111", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                  Alkalmazás Ikonja
+                </label>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    {editingApp.custom_icon || editingApp.icon_url ? (
+                      <img
+                        src={editingApp.custom_icon || editingApp.icon_url}
+                        alt="Ikon"
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "var(--radius-sm)",
+                          objectFit: "contain",
+                          background: "#171717",
+                          border: "1px solid var(--border)",
+                          padding: "3px",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "var(--radius-sm)",
+                          background: "#171717",
+                          border: "1px solid var(--border)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "var(--text-dim)",
+                        }}
+                      >
+                        <ImageIcon size={18} />
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+                        {editingApp.custom_icon ? "Homelab / Egyedi Ikon kiválasztva" : "Nincs egyedi ikon beállítva"}
+                      </div>
+                      <div style={{ fontSize: "0.6875rem", color: "var(--text-dim)", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {editingApp.custom_icon || "Alapértelmezett kezdőbetű látható"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openIconPicker("edit")}
+                    className="btn btn-sm btn-primary flex items-center gap-1.5"
+                  >
+                    <Sparkles size={13} />
+                    <span>Ikon választása</span>
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
                     Kategória
                   </label>
-                  <input
+                  <select
                     className="input"
-                    value={editingApp.category || ""}
+                    value={editingApp.category || "general"}
                     onChange={(e) => setEditingApp({ ...editingApp, category: e.target.value })}
-                    placeholder="media, network, system..."
-                  />
+                  >
+                    <option value="general">Általános</option>
+                    <option value="media">Média</option>
+                    <option value="network">Hálózat & DNS</option>
+                    <option value="system">Rendszer & VM</option>
+                    <option value="smarthome">Okosotthon</option>
+                    <option value="security">Biztonság & Auth</option>
+                    <option value="storage">Tárhely & Cloud</option>
+                    <option value="download">Letöltések</option>
+                    <option value="tools">Eszközök</option>
+                    <option value="dev">Fejlesztés</option>
+                  </select>
                 </div>
+
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                    Egyedi Ikon URL
+                    Launch URL
                   </label>
                   <input
                     className="input"
-                    value={editingApp.custom_icon || ""}
-                    onChange={(e) => setEditingApp({ ...editingApp, custom_icon: e.target.value })}
-                    placeholder="https://..."
+                    value={editingApp.launch_url || ""}
+                    onChange={(e) => setEditingApp({ ...editingApp, launch_url: e.target.value })}
+                    placeholder="https://plex.gyurus.hu"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                  Launch URL (Kattintáskor megnyíló cím)
-                </label>
-                <input
-                  className="input"
-                  value={editingApp.launch_url || ""}
-                  onChange={(e) => setEditingApp({ ...editingApp, launch_url: e.target.value })}
-                  placeholder="https://plex.gyurus.hu"
-                />
               </div>
 
               <div style={{ paddingTop: "0.5rem" }}>
@@ -395,8 +490,8 @@ export default function AppsPage() {
                 <input
                   className="input"
                   value={newApp.name}
-                  onChange={(e) => setNewApp({ ...newApp, name: e.target.value })}
-                  placeholder="pl. Proxmox VE"
+                  onChange={(e) => handleNameChange(e.target.value, "new")}
+                  placeholder="pl. Plex, Proxmox, Pi-hole..."
                   required
                 />
               </div>
@@ -409,8 +504,67 @@ export default function AppsPage() {
                   className="input"
                   value={newApp.description}
                   onChange={(e) => setNewApp({ ...newApp, description: e.target.value })}
-                  placeholder="pl. Virtualizációs környezet"
+                  placeholder="pl. Média szerver, DNS szűrő..."
                 />
+              </div>
+
+              {/* Icon Selection Card */}
+              <div style={{ padding: "0.875rem", background: "#111111", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
+                  Alkalmazás Ikonja
+                </label>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    {newApp.custom_icon ? (
+                      <img
+                        src={newApp.custom_icon}
+                        alt="Ikon"
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "var(--radius-sm)",
+                          objectFit: "contain",
+                          background: "#171717",
+                          border: "1px solid var(--border)",
+                          padding: "3px",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "var(--radius-sm)",
+                          background: "#171717",
+                          border: "1px solid var(--border)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "var(--text-dim)",
+                        }}
+                      >
+                        <ImageIcon size={18} />
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+                        {newApp.custom_icon ? "Ikon kiválasztva (Automatikus / Könyvtár)" : "Válassz ikont vagy gépeld be a nevet"}
+                      </div>
+                      <div style={{ fontSize: "0.6875rem", color: "var(--text-dim)", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {newApp.custom_icon || "Nincs beállítva"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openIconPicker("new")}
+                    className="btn btn-sm btn-primary flex items-center gap-1.5"
+                  >
+                    <Sparkles size={13} />
+                    <span>Ikon választása</span>
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -418,36 +572,35 @@ export default function AppsPage() {
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
                     Kategória
                   </label>
-                  <input
+                  <select
                     className="input"
                     value={newApp.category}
                     onChange={(e) => setNewApp({ ...newApp, category: e.target.value })}
-                    placeholder="media, network, system..."
-                  />
+                  >
+                    <option value="general">Általános</option>
+                    <option value="media">Média</option>
+                    <option value="network">Hálózat & DNS</option>
+                    <option value="system">Rendszer & VM</option>
+                    <option value="smarthome">Okosotthon</option>
+                    <option value="security">Biztonság & Auth</option>
+                    <option value="storage">Tárhely & Cloud</option>
+                    <option value="download">Letöltések</option>
+                    <option value="tools">Eszközök</option>
+                    <option value="dev">Fejlesztés</option>
+                  </select>
                 </div>
+
                 <div>
                   <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                    Ikon URL (opcionális)
+                    Launch URL
                   </label>
                   <input
                     className="input"
-                    value={newApp.custom_icon}
-                    onChange={(e) => setNewApp({ ...newApp, custom_icon: e.target.value })}
-                    placeholder="https://..."
+                    value={newApp.launch_url}
+                    onChange={(e) => setNewApp({ ...newApp, launch_url: e.target.value })}
+                    placeholder="https://pve.gyurus.hu:8006"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                  Launch URL (Kattintáskor megnyíló cím)
-                </label>
-                <input
-                  className="input"
-                  value={newApp.launch_url}
-                  onChange={(e) => setNewApp({ ...newApp, launch_url: e.target.value })}
-                  placeholder="https://pve.gyurus.hu:8006"
-                />
               </div>
 
               <div style={{ paddingTop: "0.5rem" }}>
@@ -478,6 +631,15 @@ export default function AppsPage() {
           </div>
         </div>
       )}
+
+      {/* Icon Picker Modal */}
+      <IconPickerModal
+        isOpen={isIconPickerOpen}
+        onClose={() => setIsIconPickerOpen(false)}
+        onSelectIcon={handleIconSelected}
+        currentIcon={iconPickerTarget === "new" ? newApp.custom_icon : (editingApp?.custom_icon || "")}
+        appName={iconPickerTarget === "new" ? newApp.name : (editingApp?.name || "")}
+      />
     </div>
   );
 }

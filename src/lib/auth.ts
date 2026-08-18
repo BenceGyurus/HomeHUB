@@ -36,7 +36,9 @@ export const getAuthOptions = (): NextAuthOptions => {
         logger.auth(`Lokális bejelentkezési kísérlet a(z) "${credentials.username}" felhasználóval...`);
         const user = db.prepare('SELECT * FROM users WHERE username = ?').get(credentials.username) as any;
         if (!user) {
-          logger.warn('AUTH', `Nem található felhasználó "${credentials.username}" néven az adatbázisban.`);
+          // SEC-10 FIX: Run dummy bcrypt.compare to prevent timing-based username enumeration
+          await bcrypt.compare(credentials.password, '$2b$10$dummyhashtopreventtimingattacksenumeration');
+          logger.warn('AUTH', `Sikertelen bejelentkezési kísérlet.`);
           return null;
         }
         
@@ -68,7 +70,10 @@ export const getAuthOptions = (): NextAuthOptions => {
   const isHttps = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
 
   // Secure secret generation / retrieval
-  let secret = process.env.NEXTAUTH_SECRET || settings.auth_secret;
+  // SEC-03 FIX: Reject known-insecure default values
+  const INSECURE_DEFAULTS = new Set(['super-secret-change-me', 'changeme', 'secret', '']);
+  const envSecret = process.env.NEXTAUTH_SECRET?.trim();
+  let secret = (envSecret && !INSECURE_DEFAULTS.has(envSecret)) ? envSecret : settings.auth_secret;
   if (!secret) {
     secret = crypto.randomBytes(32).toString('hex');
     try {

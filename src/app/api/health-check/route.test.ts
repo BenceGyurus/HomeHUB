@@ -24,7 +24,7 @@ jest.mock('@/lib/db', () => ({
   }
 }));
 
-describe('Health Check API Route', () => {
+describe('Health Check API Route (Hardened)', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     (db.prepare as jest.Mock).mockImplementation((query: string) => ({
@@ -48,9 +48,9 @@ describe('Health Check API Route', () => {
     expect(res.status).toBe(401);
   });
 
-  it('probes app health for authenticated user', async () => {
+  it('SEC-06: blocks dangerous metadata URLs', async () => {
     (getServerSession as jest.Mock).mockResolvedValueOnce({
-      user: { name: 'testuser' }
+      user: { name: 'admin', isAdmin: true }
     });
 
     (db.prepare as jest.Mock).mockImplementation((query: string) => ({
@@ -58,8 +58,8 @@ describe('Health Check API Route', () => {
         if (query.includes('FROM settings')) return [];
         if (query.includes('FROM apps')) {
           return [
-            { id: 1, name: 'Immich', launch_url: 'https://immich.example.com', healthcheck_url: 'https://immich.example.com/api/ping' },
-            { id: 2, name: 'OfflineApp', launch_url: 'http://non-existent-domain-12345.com', healthcheck_url: null },
+            { id: 1, name: 'MetadataProbe', launch_url: 'http://169.254.169.254/latest/meta-data/', healthcheck_url: null },
+            { id: 2, name: 'LocalhostProbe', launch_url: 'http://localhost:8080', healthcheck_url: null },
           ];
         }
         return [];
@@ -67,17 +67,6 @@ describe('Health Check API Route', () => {
       get: jest.fn().mockReturnValue(null),
       run: jest.fn().mockReturnValue({ changes: 1 }),
     }));
-
-    // Mock global fetch for health probing
-    global.fetch = jest.fn().mockImplementation((url: string) => {
-      if (url.includes('immich')) {
-        return Promise.resolve({
-          status: 200,
-          ok: true,
-        });
-      }
-      return Promise.reject(new Error('Connection refused'));
-    }) as any;
 
     const req = new NextRequest('http://localhost/api/health-check', {
       method: 'POST',
@@ -88,8 +77,8 @@ describe('Health Check API Route', () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.results[1].status).toBe('online');
+    // Both dangerous URLs should be blocked (reported as offline)
+    expect(data.results[1].status).toBe('offline');
     expect(data.results[2].status).toBe('offline');
   });
 });

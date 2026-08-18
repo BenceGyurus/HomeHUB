@@ -588,14 +588,16 @@ export default function DashboardClient({ initialApps, user }: DashboardClientPr
         }}
       >
         <div>© 2026 HomeHUB • Self-Hosted Command Center</div>
-        <div className="flex gap-3">
-          <Link href="/admin/settings" className="btn-ghost" style={{ fontSize: "0.75rem" }}>
-            {t("settings")}
-          </Link>
-          <Link href="/admin/sync" className="btn-ghost" style={{ fontSize: "0.75rem" }}>
-            {t("sync")}
-          </Link>
-        </div>
+        {user?.isAdmin && (
+          <div className="flex gap-3">
+            <Link href="/admin/settings" className="btn-ghost" style={{ fontSize: "0.75rem" }}>
+              {t("settings")}
+            </Link>
+            <Link href="/admin/sync" className="btn-ghost" style={{ fontSize: "0.75rem" }}>
+              {t("sync")}
+            </Link>
+          </div>
+        )}
       </footer>
     </div>
   );
